@@ -10,7 +10,7 @@ This chat agent helps 2–4 friends choose where to hang out in New York City. S
 
 Each chat has its own session ID. The agent remembers the group, routes, and time limits within that session. Different sessions stay separate. **New chat** clears the current chat.
 
-Sessions stay in server memory for up to one hour without use. A server restart clears them.
+Sessions expire after one hour without use. The next chat request removes expired sessions. A server restart clears them.
 
 ## 3. What tools does it use?
 
@@ -51,19 +51,21 @@ The main idea is to make a group decision: find a meeting point that reduces the
 
 ## 6. Three sample queries
 
+Open [the live app](https://midpoint-nyc-896481216161.us-central1.run.app). Sign in with your Google account if asked. Click **New chat**, enter a message, and click **Send**.
+
 Run these in order in one chat. Times and results may change.
 
 1. **Find a meeting point**
 
-   > Alice: Columbia University, Broadway and W 116th St, Manhattan. Bob: Atlantic Terminal, Brooklyn. Find a fair place for us to meet by public transit.
+   > Alice starts at Columbia University, Broadway and W 116th St, Manhattan. Bob starts at Atlantic Terminal, Brooklyn. Compare Times Square, Union Square, and Grand Central by public transit.
 
 2. **Add a time limit**
 
-   > Bob can travel at most 20 minutes. Does any spot work?
+   > Bob can travel at most 20 minutes. Does any of these spots work?
 
 3. **Remove the limit and plan the meetup**
 
-   > Remove Bob's limit. Find two restaurants near the best meeting point. We will meet at that meeting point tomorrow at 7 PM, New York time. When should each person leave?
+   > Remove Bob's time limit. Find two restaurants near the best meeting spot. We will meet at that spot tomorrow at 7 PM, New York time. When should each person leave?
 
 ## 7. How to run it locally
 
@@ -81,6 +83,8 @@ uv run app.py
 The app asks for the Google Maps API key in the terminal. Input is hidden. Open **http://localhost:8001/**.
 
 For a server, set `GOOGLE_MAPS_API_KEY` in its environment. Keep keys out of the repo and chat.
+
+On Cloud Run, use one worker and set both the service and revision maximum instances to 1. Chat memory is stored in one server instance.
 
 ## 8. Limits
 
