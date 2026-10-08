@@ -87,21 +87,7 @@ uv run pytest -q
 node --test static/chat.test.js
 ```
 
-## 8. Deployment and submission
-
-Deploy to **Google Cloud Run** with continuous deployment from GitHub and public access for grading. Use the root `Dockerfile` and branch `main`. Full settings and key setup are in [docs/deployment.md](docs/deployment.md).
-
-After deployment, test all three queries on the public site. Generate the required root `submission.json`:
-
-```bash
-uv run python scripts/write_submission.py https://YOUR-ACTUAL-SERVICE.run.app
-```
-
-The file contains the real `deploy_url` and `authors: ["yt2979"]`. `submission.example.json` is a template; it is not the final file.
-
-The repo includes the required `app.py`, `pyproject.toml`, `uv.lock`, and `README.md`. Submit the GitHub repo URL on CourseWorks. Keep the site running until grades are released. For a private repo, add `codeboi07`, `bhuvighosh3`, `nniishhh`, and `x` as collaborators.
-
-## 9. Limits
+## 8. Limits
 
 The agent compares only the given meeting points. Travel times are estimates. Changing only a time limit reuses saved routes. Future plans use routes for the requested meeting time.
 
