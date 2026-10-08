@@ -29,11 +29,12 @@ Date: 2026-10-08. Developer machine, class project ieor-4570-f26-yt2979.
 
 ## Required before submission
 
-- Latest user trace: all six leaving-now route requests returned HTTP 400, followed by eight repeated model calls. The old generic message did not preserve Google's specific reason, so the invalid field is not yet identified. Added per-turn duplicate-route suppression and bounded repeated-failure handling, plus redacted Google HTTP diagnostics. 41 Python tests and compile checks passed, including reproductions of repeated failed and successful queries. Restart and inspect the next live result to diagnose the remaining HTTP 400; no claim that live route access is fixed.
+- An earlier user trace showed six HTTP 400 responses followed by eight repeated model calls. Added per-turn duplicate-route suppression, bounded repeated-failure handling and redacted Google diagnostics. The precise cause of that HTTP 400 was not identified. A subsequent user-provided live conversation completed all four flows without errors or repeated queries: initial comparison, limit addition, explicit removal before Places, and future routes → fairness → departures. This is one successful run, not a guarantee of API availability.
+- Upload verification: 41 Python tests and 12 Node tests passed (53 total). Submitted files exclude credentials, the virtual environment and internal planning notes.
 
 - Restart the local backend and repeat integrated Maps+Gemini tests with the updated code, then repeat them on the deployed service. A configured runtime key alone does not prove that every query works.
 - Container build: Docker CLI exists but the local Docker/OrbStack daemon is not running, so no successful container build is claimed.
-- GitHub repository push and continuous Cloud Run deployment. GitHub CLI is currently unauthenticated and this repo has no remote. Do not infer a deployed URL.
+- Complete the GitHub repository upload and continuous Cloud Run deployment. GitHub CLI is authenticated as yt2979, and origin is https://github.com/yt2979/midpoint-nyc.git. A Cloud Run deployment and public service URL have not yet been verified.
 - Run README examples on public Cloud Run site, confirm GitHub push creates a revision, generate final submission.json with actual deploy_url and solo author yt2979, keep site running until grades.
 
 ## Independent review
