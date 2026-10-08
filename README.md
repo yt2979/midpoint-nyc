@@ -4,7 +4,7 @@ By **yt2979** for IEOR 4570. Built from the class `gemini-web-tool-calling` exam
 
 ## 1. Who is it for?
 
-This chat agent helps 2–4 friends find a fair place to meet in New York City. Give each person's name and starting address or station. It finds meeting options based on where the group starts, compares travel times, checks personal time limits, finds nearby places, and plans when to leave. You can also name places you want to compare.
+This chat agent helps 2–4 friends choose where to hang out in New York City. Share each person's name and starting address or station. Add 2–3 places you have in mind for a better comparison. It compares travel times and personal time limits, finds nearby places, and plans when to leave. If no places are given, it finds a few options near the group.
 
 ## 2. How does it remember the chat?
 
