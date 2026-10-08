@@ -1,5 +1,6 @@
 """Instructor-style Gemini tool loop with trace-preserving recovery."""
 import json
+import logging
 import os
 from copy import deepcopy
 
@@ -11,6 +12,10 @@ from tools import TOOLS, run_tool
 MODEL = os.getenv("GEMINI_MODEL","vertex_ai/gemini-3.5-flash-lite")
 MAX_TOOL_ROUNDS = 8
 MAX_TOOL_CALLS = 12
+logger = logging.getLogger(__name__)
+TRANSIENT_ERRORS = (litellm.APIConnectionError, litellm.Timeout,
+                    litellm.RateLimitError, litellm.ServiceUnavailableError,
+                    litellm.InternalServerError)
 
 SYSTEM_PROMPT = """You are THE MIDPOINT NYC, a practical meetup planner for 2–4 friends in NYC.
 Reply only in simple English. English is a fixed requirement of this course website. Do not change languages, even if the user asks you to. You may read other languages, but your reply must be English. Keep official place names and source links accurate. Help everyone share the travel burden, compare a finite shortlist, and find nearby things to do. Fairness means MINIMIZING THE LONGEST commute, then total commute, subject to individual HARD limits. Minimizing the sum is a different objective; explain the tradeoff with numbers from the fairness tool, never invent arithmetic or claim a globally optimal NYC location.
@@ -43,24 +48,70 @@ def _reject_json_constant(value):
     raise ValueError("Non-finite JSON number is not permitted")
 
 
+def _available_tools(state):
+    """Expose downstream tools only after this turn's feasibility check."""
+    allowed = {"get_group_routes"}
+    routes = state.get("route_sets", {})
+    if routes:
+        allowed.add("evaluate_meeting_fairness")
+    for rid, check in state.get("fairness_checks", {}).items():
+        if (rid not in routes or check.get("turn_id") != state.get("_turn_id")
+                or not check.get("result", {}).get("ranked_feasible_ids")):
+            continue
+        allowed.add("search_nearby_places")
+        if routes[rid].get("meeting_time"):
+            allowed.add("plan_group_departures")
+    return [tool for tool in TOOLS if tool["function"]["name"] in allowed]
+
+
+def _model_error_text(exc, has_trace):
+    if isinstance(exc, TRANSIENT_ERRORS):
+        text = "Gemini is temporarily unavailable. Please try again."
+    elif isinstance(exc, litellm.AuthenticationError) or getattr(exc, "status_code", None) == 403:
+        text = "The server cannot access Gemini. Please contact the site owner."
+    else:
+        text = "Gemini could not finish this reply. Please try again."
+    if has_trace:
+        text += " You can still view the tool results above."
+    return text
+
+
 def run_agent(messages, state, completion=None, client=None):
     completion = completion or litellm.completion
     client = client or MapsClient()
     trace=[]
     empty_replies = 0
     route_requests = {}
+    retry_used = False
     state["_turn_id"] = state.get("_turn_id", 0) + 1
     for _ in range(MAX_TOOL_ROUNDS):
-        try:
-            kwargs={"model":MODEL,"vertex_location":"global","messages":messages,"tools":TOOLS,
-                    "timeout":60,"num_retries":0,"max_tokens":3500}
-            if os.getenv("GOOGLE_CLOUD_PROJECT"):
-                kwargs["vertex_project"]=os.environ["GOOGLE_CLOUD_PROJECT"]
-            reply=completion(**kwargs).choices[0].message
-        except Exception:
-            text="I can't reach Gemini right now. Check the server's Google Cloud setup and try again."
-            messages.append({"role":"assistant","content":text})
-            return text,trace
+        available_tools = _available_tools(state)
+        kwargs={"model":MODEL,"vertex_location":"global","messages":messages,"tools":available_tools,
+                # AUTO can recall an unavailable function from earlier chat turns.
+                # VALIDATED permits text replies and enforces this turn's tool list.
+                "extra_body":{"toolConfig":{"functionCallingConfig":{
+                    "mode":"VALIDATED",
+                    "allowedFunctionNames":[t["function"]["name"] for t in available_tools]}}},
+                "timeout":60,"num_retries":0,"max_tokens":3500}
+        if os.getenv("GOOGLE_CLOUD_PROJECT"):
+            kwargs["vertex_project"]=os.environ["GOOGLE_CLOUD_PROJECT"]
+        while True:
+            try:
+                reply=completion(**kwargs).choices[0].message
+                break
+            except Exception as exc:
+                # Raw exception messages/tracebacks may contain credentials or chat text.
+                status = getattr(exc, "status_code", None)
+                logger.warning("Gemini completion failed: type=%s status=%s retry_used=%s",
+                               type(exc).__name__, status if isinstance(status, int) else None,
+                               retry_used)
+                if isinstance(exc, TRANSIENT_ERRORS) and not retry_used:
+                    retry_used = True
+                    kwargs["timeout"] = 15
+                    continue
+                text = _model_error_text(exc, bool(trace))
+                messages.append({"role":"assistant","content":text})
+                return text,trace
         if not reply.tool_calls and not (reply.content or "").strip():
             empty_replies += 1
             if empty_replies < 2:
