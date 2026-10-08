@@ -1,0 +1,15 @@
+.git
+.venv
+.env*
+__pycache__
+.pytest_cache
+.superpowers
+*.db
+*.sqlite*
+tests
+docs
+scripts
+test_routes.py
+test_places.py
+submission*.json
+static/*.test.js

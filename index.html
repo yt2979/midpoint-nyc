@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#F8F6F0">
+  <meta name="description" content="THE MIDPOINT NYC compares travel times to help 2–4 friends choose a fair meeting place.">
+  <title>THE MIDPOINT NYC | Find a fair place to meet</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&amp;family=Plus+Jakarta+Sans:wght@400;500;600&amp;display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/chat.js" defer></script>
+</head>
+<body>
+  <div class="site-shell">
+    <header class="site-header">
+      <div class="header-actions">
+        <span class="header-caption">FOR 2–4 FRIENDS</span>
+        <button id="new-chat" class="new-chat-button" type="button" aria-label="Start a new chat">New chat <span aria-hidden="true">↗</span></button>
+      </div>
+    </header>
+
+    <main class="main-content">
+      <section id="welcome" class="welcome" aria-labelledby="welcome-title">
+        <div class="eyebrow"><span class="eyebrow-line"></span> THE CITY, TOGETHER</div>
+        <div class="hero-heading">
+          <h1 id="welcome-title">A fairer place <em>to meet.</em></h1>
+          <span class="hero-aside">Meet in New York. Share the trip.</span>
+        </div>
+        <figure class="city-frame">
+          <img src="https://images.unsplash.com/photo-1496442226666-8d4d0e62e6e9?q=80&amp;w=1600&amp;auto=format&amp;fit=crop" alt="New York City street view" fetchpriority="high" width="1600" height="900">
+          <div class="city-overlay" aria-hidden="true"></div>
+          <span class="city-vertical" aria-hidden="true">MEET IN NEW YORK</span>
+          <span class="city-coordinates" aria-hidden="true">LAT 40.7128° N / LON 74.0060° W</span>
+          <figcaption>New York City</figcaption>
+        </figure>
+        <p class="welcome-instruction">Choose what you need. I’ll ask for your plans.</p>
+        <div class="examples" aria-label="Choose what you need">
+          <button class="example-button" type="button" data-guide="meetup">Fair meetup</button>
+          <button class="example-button" type="button" data-guide="limits">Time limits</button>
+          <button class="example-button" type="button" data-guide="places">Nearby places</button>
+          <button class="example-button" type="button" data-guide="departures">When to leave</button>
+        </div>
+      </section>
+
+      <section id="transcript" class="transcript" aria-label="Chat history" aria-live="polite" aria-relevant="additions text" hidden></section>
+      <div id="notice" class="notice" role="alert" hidden></div>
+      <div id="followup-actions" class="followup-actions" aria-label="Follow-up questions" hidden>
+        <button class="example-button followup-button" type="button" data-guide="limits">Time limits <span aria-hidden="true">↗</span></button>
+        <button class="example-button followup-button" type="button" data-guide="places">Nearby places <span aria-hidden="true">↗</span></button>
+        <button class="example-button followup-button" type="button" data-guide="departures">When to leave <span aria-hidden="true">↗</span></button>
+      </div>
+      <form id="chat-form" class="composer" aria-label="Send a message">
+        <label class="visually-hidden" for="message-input">Tell me where each person starts</label>
+        <textarea id="message-input" name="message" rows="2" maxlength="4000" placeholder="Where are your 2–4 friends starting from?" required></textarea>
+        <button id="send-button" type="submit" aria-label="Send a message"><span>Send</span><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M3 10h13m-5-5 5 5-5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      </form>
+    </main>
+
+  </div>
+</body>
+</html>

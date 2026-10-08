@@ -1,0 +1,16 @@
+[project]
+name = "meet-fair-nyc"
+version = "0.1.0"
+description = "A tool-calling agent for fair group meetups in NYC"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.109.0", "uvicorn>=0.27.0", "litellm>=1.50",
+  "google-cloud-aiplatform>=1.40.0", "requests>=2.31", "jsonschema>=4.26", "tzdata>=2025.2",
+]
+
+[dependency-groups]
+dev = ["pytest>=8", "httpx2>=2"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
