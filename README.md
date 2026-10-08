@@ -78,14 +78,7 @@ uv run app.py
 
 The app asks for the Google Maps API key in the terminal. Input is hidden. Open **http://localhost:8001/**.
 
-For a server, set `GOOGLE_MAPS_API_KEY` in its environment. Keep keys out of the repo and chat. `.env.example` lists the settings.
-
-Run the tests:
-
-```bash
-uv run pytest -q
-node --test static/chat.test.js
-```
+For a server, set `GOOGLE_MAPS_API_KEY` in its environment. Keep keys out of the repo and chat.
 
 ## 8. Limits
 

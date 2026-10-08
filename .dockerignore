@@ -6,10 +6,4 @@ __pycache__
 .superpowers
 *.db
 *.sqlite*
-tests
-docs
-scripts
-test_routes.py
-test_places.py
-submission*.json
-static/*.test.js
+submission.json
