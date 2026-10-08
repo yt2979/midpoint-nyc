@@ -51,7 +51,7 @@ The main idea is to make a group decision: find a meeting point that reduces the
 
 ## 6. Three sample queries
 
-Open [the live app](https://midpoint-nyc-896481216161.us-central1.run.app). Sign in with your Google account if asked. Click **New chat**, enter a message, and click **Send**.
+Open [the live app](https://midpoint-nyc-896481216161.us-central1.run.app). Sign in with your Columbia Google account. Click **New chat**, enter a message, and click **Send**.
 
 Run these in order in one chat. Times and results may change.
 
