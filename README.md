@@ -4,7 +4,7 @@ By **yt2979** for IEOR 4570. Built from the class `gemini-web-tool-calling` exam
 
 ## 1. Who is it for?
 
-This chat agent helps 2–4 friends find a fair place to meet in New York City. Give each person's name and starting address or station. It compares travel times, checks personal time limits, finds nearby places, and plans when to leave.
+This chat agent helps 2–4 friends find a fair place to meet in New York City. Give each person's name and starting address or station. It finds meeting options based on where the group starts, compares travel times, checks personal time limits, finds nearby places, and plans when to leave. You can also name places you want to compare.
 
 ## 2. How does it remember the chat?
 
@@ -16,12 +16,14 @@ Sessions stay in server memory for up to one hour without use. A server restart 
 
 | Tool | Main inputs | What it does |
 | --- | --- | --- |
-| `get_group_routes` | People, 1–3 meeting points, optional meeting time | Gets travel times from **Google Routes API**. Supports public transit and driving. |
+| `get_group_routes` | People, optional meeting points and meeting time | Finds up to 3 meeting options with **Google Places API**, then gets each person's travel time from **Google Routes API**. Supports public transit and driving. |
 | `evaluate_meeting_fairness` | Route set ID, goal, personal time limits | Checks limits and ranks the meeting points. This is the project's **original tool**. |
 | `search_nearby_places` | Route set ID, meeting point ID, type, optional search word | Gets restaurants, cafes, or activities from **Google Places API** within 1 km. |
 | `plan_group_departures` | Route set ID, meeting point ID, buffer | Uses the measured route and available train or bus times to calculate when each person should leave. |
 
 The original fairness tool first removes points that break anyone's time limit. It then picks the point with the shortest longest trip. Ties use the lowest total travel time. It can also compare a goal of lowest total travel time.
+
+If no meeting points are given, Places finds the starting locations and nearby stations. For a group that only drives, it looks for parks and cafes. The group locations and time limits guide the search. It picks up to 3 different places to check. Real route times decide the winner; distance alone does not. There is no fixed list of meeting points.
 
 Tool names, descriptions, and input rules are defined in `tools.py`. Tools use routes saved by the server. Errors give a reason and a next step. Failed routes cannot support a recommendation.
 
@@ -51,9 +53,9 @@ The main idea is to make a group decision: find a meeting point that reduces the
 
 Run these in order in one chat. Times and results may change.
 
-1. **Compare meeting points**
+1. **Find a meeting point**
 
-   > Alice: Columbia University, Broadway and W 116th St, Manhattan. Bob: Atlantic Terminal, Brooklyn. Compare Times Square, Union Square and Grand Central by public transit.
+   > Alice: Columbia University, Broadway and W 116th St, Manhattan. Bob: Atlantic Terminal, Brooklyn. Find a fair place for us to meet by public transit.
 
 2. **Add a time limit**
 
@@ -82,6 +84,6 @@ For a server, set `GOOGLE_MAPS_API_KEY` in its environment. Keep keys out of the
 
 ## 8. Limits
 
-The agent compares only the given meeting points. Travel times are estimates. Changing only a time limit reuses saved routes. Future plans use routes for the requested meeting time.
+The agent compares a small set of places found near the group, or the places you name. It does not check every place in NYC. Automatic search makes up to 7 Places requests, followed by up to 12 Routes requests. Travel times are estimates. Changing only a time limit reuses saved routes. Future plans use routes for the requested meeting time at the selected meeting point.
 
 Nearby places are within a straight-line radius of 1 km. A final restaurant needs its own route check. Check hours and availability before going. The app does not book rides, tables, or tickets.

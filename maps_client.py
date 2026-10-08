@@ -20,6 +20,45 @@ PLACE_FIELDS = ",".join("places." + f for f in [
     "googleMapsUri", "rating", "userRatingCount", "priceLevel",
     "currentOpeningHours", "businessStatus", "attributions",
 ])
+MEETING_FIELDS = ",".join("places." + f for f in [
+    "id", "displayName", "formattedAddress", "location", "primaryType", "types",
+    "googleMapsUri", "businessStatus", "attributions",
+])
+NYC_VIEWPORT = {"low": {"latitude":40.477398,"longitude":-74.259087},
+                "high":{"latitude":40.91618,"longitude":-73.70018}}
+
+
+def nyc_location(location):
+    """Validate finite coordinates inside the supported NYC search viewport."""
+    if not isinstance(location, dict):
+        return False
+    for key in ("latitude", "longitude"):
+        value = location.get(key)
+        if type(value) not in (int, float) or not math.isfinite(value):
+            return False
+        if not NYC_VIEWPORT["low"][key] <= value <= NYC_VIEWPORT["high"][key]:
+            return False
+    return True
+
+
+def _meeting_place(place):
+    if not isinstance(place, dict) or not nyc_location(place.get("location")):
+        return None
+    if not all(isinstance(place.get(key), str) and place[key].strip()
+               for key in ("id", "formattedAddress")):
+        return None
+    # The rectangular NYC viewport also covers parts of New Jersey.
+    if not re.search(r"\bNY\b", place["formattedAddress"]):
+        return None
+    display = place.get("displayName") or {}
+    name = display.get("text") if isinstance(display, dict) else None
+    if not isinstance(name, str) or not name.strip():
+        return None
+    if place.get("businessStatus") in ("CLOSED_PERMANENTLY", "CLOSED_TEMPORARILY"):
+        return None
+    return {"place_id":place["id"], "name":name, "address":place["formattedAddress"],
+            "location":place["location"], "type":place.get("primaryType"),
+            "maps_url":place.get("googleMapsUri"), "attributions":place.get("attributions",[])}
 
 
 def seconds(value):
@@ -87,7 +126,9 @@ class MapsClient:
     def route(self, member, candidate, meeting_time=None):
         now = datetime.now(timezone.utc)
         mode = member.get("travel_mode", "TRANSIT")
-        body = {"origin":{"address":member["address"]}, "destination":{"address":candidate["address"]},
+        origin = {"placeId":member["place_id"]} if member.get("place_id") else {"address":member["address"]}
+        destination = {"placeId":candidate["place_id"]} if candidate.get("place_id") else {"address":candidate["address"]}
+        body = {"origin":origin, "destination":destination,
                 "travelMode":mode, "languageCode":"en-US", "units":"IMPERIAL"}
         if mode == "TRANSIT":
             body["transitPreferences"] = {"allowedTravelModes":["SUBWAY","TRAIN","BUS","LIGHT_RAIL","RAIL"]}
@@ -139,6 +180,41 @@ class MapsClient:
                     "time_assumption":assumption, "source":"Google Maps / Routes API", "observed_at":now.isoformat()}
         except (ValueError,TypeError,KeyError,IndexError,AttributeError):
             return {"error":"Routes API response lacks usable duration/schedule data. Retry before recommending this destination."}
+
+    def resolve_origin(self, address):
+        """Look up an exact starting point, without using a paid Geocoding API."""
+        body = {"textQuery":address, "pageSize":1, "languageCode":"en", "regionCode":"US",
+                "locationBias":{"rectangle":NYC_VIEWPORT}}
+        data = self._request(PLACES_URL+"searchText", body, MEETING_FIELDS, "Places API (New)")
+        if "error" in data:
+            return data
+        raw = data.get("places", [])
+        found = _meeting_place(raw[0]) if isinstance(raw, list) and raw else None
+        if not found:
+            return {"error":"No usable origin found in the NYC search area. Give a precise street address or station and borough."}
+        return found
+
+    def meeting_places(self, center, radius, driving_only=False):
+        """Return real meeting candidates in one bounded search circle."""
+        kinds = ["park", "cafe"] if driving_only else ["subway_station", "train_station"]
+        body = {"includedTypes":kinds, "maxResultCount":8, "rankPreference":"DISTANCE",
+                "languageCode":"en", "locationRestriction":{"circle":{"center":center,"radius":radius}}}
+        data = self._request(PLACES_URL+"searchNearby", body, MEETING_FIELDS, "Places API (New)")
+        if "error" in data:
+            return data
+        raw = data.get("places", [])
+        if not isinstance(raw, list):
+            return {"error":"Places returned unreadable meeting candidates. Retry the search."}
+        places = []
+        for item in raw:
+            found = _meeting_place(item)
+            types = item.get("types", []) if isinstance(item, dict) else []
+            if not isinstance(types, list):
+                types = []
+            if (found and (found["type"] in kinds or any(t in kinds for t in types)) and
+                    _distance(center["latitude"], center["longitude"], found["location"]) <= radius):
+                places.append(found)
+        return {"places":places[:8]}
 
     def places(self, lat, lng, category, keyword=None):
         center={"latitude":lat,"longitude":lng}

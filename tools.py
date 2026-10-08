@@ -7,6 +7,7 @@ import uuid
 from jsonschema import Draft202012Validator
 
 from fairness import evaluate, departures, parse_time
+from meeting_candidates import discover_candidates
 
 
 def field(kind, description, **extra):
@@ -32,10 +33,10 @@ ROUTE_ID = field("string","Server-generated route_set_id returned by get_group_r
 CANDIDATE_ID = field("string","Candidate id such as c1 from that route set, not a place name.",minLength=1,maxLength=20)
 
 TOOLS = [
-    tool("get_group_routes", "Query Google Routes for 2–4 people's travel to 1–3 precise NYC destinations. Usually compare 2–3; use 1 to recheck an exact final venue. Returns trusted route_set_id and complete per-person observations/errors. Max 12 external calls. If meeting date/time, origins, destinations or modes change, fetch a new route set. For leaving now, omit meeting_time.", {
+    tool("get_group_routes", "Find and measure meeting options for 2–4 friends. OMIT candidates when the user asks you to find a spot: Places API resolves origins and finds up to 3 real places near this group, then Routes API measures every person's trip. No fixed default places. Supply candidates only for destinations the user specified or exact Places-returned venues to recheck. Up to 7 discovery + 12 route requests; do not repeat unchanged queries. Returns trusted route_set_id, candidate search evidence and complete per-person observations/errors. When origins, destinations, modes or meeting time change, fetch new routes. For leaving now, omit meeting_time.", {
         "members":field("array","2–4 friends with unique names, precise origins, individual modes and optional numeric hard travel limits. Omitted limits persist for each named member in this chat; use evaluate_meeting_fairness to remove a limit.",items=MEMBER_SCHEMA,minItems=2,maxItems=4),
-        "candidates":field("array","1–3 candidate destinations. State any default shortlist to user; optimum is among these only.",items=CANDIDATE_SCHEMA,minItems=1,maxItems=3),
-        "meeting_time":field("string","Optional FUTURE meeting date and time with explicit timezone offset, e.g. 2026-12-12T18:00:00-05:00 (New York winter). Transit queries arrival-by; driving approximates departure one hour earlier.",minLength=20,maxLength=40)},["members","candidates"]),
+        "candidates":field("array","Optional 1–3 exact destinations explicitly specified by the user or returned by Places. Omit entirely to discover dynamic candidates from this group's origins. Do not supply guessed default places. Optimum is among the measured candidates only.",items=CANDIDATE_SCHEMA,minItems=1,maxItems=3),
+        "meeting_time":field("string","Optional FUTURE meeting date and time with explicit timezone offset, e.g. 2026-12-12T18:00:00-05:00 (New York winter). Transit queries arrival-by; driving approximates departure one hour earlier.",minLength=20,maxLength=40)},["members"]),
     tool("evaluate_meeting_fairness", "Original deterministic fairness/constraint tool. Read a trusted route set; rank feasible candidates by minimizing longest commute, then total commute, or compare total_time. Missing/failed routes cannot win. Return each person's time, spread, violations and explicit no-solution conflicts. Never relax limits silently. Call this in the CURRENT user request before searching places or planning departures, including after a new route query or changing/removing a limit. Reuse route data for constraints-only changes without new API calls.", {
         "route_set_id":ROUTE_ID,
         "objective":field("string","fair minimizes longest commute (default); total_time minimizes combined commute. Compare both to explain tradeoff.",enum=["fair","total_time"]),
@@ -142,7 +143,6 @@ def _get_routes(args,state,client):
         if "max_minutes" in member:
             limits[normalized] = member["max_minutes"]
         member["max_minutes"] = limits.get(normalized)
-    candidates=[{**c,"id":f"c{i+1}"} for i,c in enumerate(deepcopy(args["candidates"]))]
     meeting=args.get("meeting_time")
     if meeting:
         try:
@@ -154,10 +154,31 @@ def _get_routes(args,state,client):
             return {"error":"Provide a valid future meeting date/time with timezone offset; e.g. 2026-12-12T18:00:00-05:00. Ask if unclear."}
     if not client.configured:
         return {"error":"Server setup needed: GOOGLE_MAPS_API_KEY must be configured with Routes API and Places API (New) enabled. Never ask for a key in chat."}
+    discovery = None
+    origin_places = {}
+    if "candidates" in args:
+        chosen = deepcopy(args["candidates"])
+        # Google sometimes gives a station only a borough/postcode address.
+        # Preserve its observed identity for an exact same-session recheck.
+        trusted = [c for s in reversed(list(state.get("route_sets", {}).values())) for c in s["candidates"]
+                   if c.get("place_id")]
+        for candidate in chosen:
+            match = next((c for c in trusted if all(c[key].strip().casefold() == candidate[key].strip().casefold()
+                                                   for key in ("name", "address"))), None)
+            if match:
+                candidate.update({key:value for key,value in deepcopy(match).items() if key != "id"})
+    else:
+        discovery = discover_candidates(members, client)
+        if "error" in discovery:
+            return discovery
+        chosen = deepcopy(discovery["candidates"])
+        origin_places = {o["member"]:o["place_id"] for o in discovery["origins"]}
+    candidates = [{**c,"id":f"c{i+1}"} for i,c in enumerate(chosen)]
     def one(pair):
         member,candidate=pair
         try:
-            data=client.route(member,candidate,meeting)
+            origin = dict(member, place_id=origin_places[member["name"]]) if origin_places else member
+            data=client.route(origin,candidate,meeting)
         except Exception:
             data={"error":"Route request failed. Retry this origin/destination with a precise address."}
         return {"member_id":member["name"],"candidate_id":candidate["id"],**data}
@@ -168,6 +189,8 @@ def _get_routes(args,state,client):
     snapshot={"route_set_id":rid,"members":members,"candidates":candidates,"meeting_time":meeting,"rows":rows,
               "observed_at":datetime.now(timezone.utc).isoformat(),"source":"Google Maps / Routes API",
               "scope":"Finite candidate shortlist only. Durations are estimates; driving is not an Uber quote or pickup estimate."}
+    if discovery is not None:
+        snapshot["candidate_search"] = {key:value for key,value in discovery.items() if key != "candidates"}
     store=state.setdefault("route_sets",{})
     store[rid]=snapshot
     while len(store)>12:
